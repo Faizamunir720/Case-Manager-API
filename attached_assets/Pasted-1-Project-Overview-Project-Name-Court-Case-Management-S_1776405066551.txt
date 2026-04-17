@@ -1,0 +1,320 @@
+1.Project Overview
+
+
+Project Name: 
+• Court Case Management System 
+Purpose: 
+• Digitize and organize court case workflows, enabling lawyers, admins, and judges to manage cases, schedule hearings, and track status progression 
+System Type: 
+• REST-based backend application (API-first design) 
+Core Functionality: 
+• Allow lawyers to register and create cases 
+• Allow admins to manage and assign cases 
+• Allow judges to handle hearings and update outcomes 
+• Maintain a timeline of hearings for each case 
+• Track case status progression (Pending → Ongoing → Closed) 
+• Ensure secure access using authentication and role-based authorization 
+Out of Scope: 
+• Real legal document verification, Evidence/media file storage, Payment systems, Public access portal, AI decision making 
+2. MODULES / ENTITIES 
+
+2. MODULES / ENTITIES / ROUTERS OVERVIEW/ ROUTERS OVERVIEW
+RVIEW 
+2.1 Authentication Module 
+Handles user registration, login, and JWT token-based authentication
+Router: /auth 
+• User registration (Lawyer, Admin, Judge) 
+• User login 
+• Token refresh 
+2.2 Case Module 
+Core entity managing case information, lifecycle, and status tracking 
+Router: /cases 
+• Create new cases, Retrieve case details, Update case information, List all cases, Assign cases to judges 
+2.3 Hearing Module 
+Manages hearing schedules, outcomes, and timeline tracking 
+Router: /hearings 
+• Create hearing schedules, Update hearing outcomes, Retrieve hearing history, List all hearings 2.4 User Management Module 
+Manages user profiles, roles, and permissions 
+Router: /users 
+• Get user profile, Update user information, List all users (Admin only) 
+3. API END3. API ENDPOINTS SPECIFICATION
+POINTS SPECIFICATION 
+3.1 AUTHENTICATION ENDPOINTS 
+3.1.1 Register User 
+Method 	POST
+Route 	/auth/register
+Description 	Register a new user
+Authentication 	Not Required
+
+
+Request Body: 
+{ "name": "string", "email": "string (unique)", "password": "string (min 8 chars)", "role": "string (lawyer|admin|judge)", "phone": "string (optional)"} 
+Response (201 Created): 
+{ "id": "integer", "name": "string", "email": "string", "role": "string",  "createdAt": "timestamp"} 
+Error Responses: 
+• 400: Missing/invalid fields | 409: Email already registered | 422: Invalid role Normal Course: 
+1. User submits registration with valid data 
+2. System validates email uniqueness
+3. Password hashed and stored securely 
+4. User record created in database 
+3.1.2 Login User 
+Method 	POST
+Route 	/auth/login
+Description 	Authenticate user and generate JWT
+Authentication 	Not Required
+
+
+Request Body: 
+{ "email": "string", "password": "string"} 
+Response (200 OK): 
+{ "token": "string (JWT)", "refreshToken": "string", "user": { "id": "integer", "name": "string", "email": "string", "role": "string" }} 
+Error Responses: 
+• 400: Missing email/password | 401: Invalid credentials 
+3.1.3 Refresh Token 
+Method 	POST
+Route 	/auth/refresh
+Description 	Generate new access token
+Authentication 	Required
+
+
+Request Body: 
+{ "refreshToken": "string"} 
+Response (200 OK): 
+{ "token": "string (JWT)"} 
+3.2 CASE ENDPOINTS 
+3.2.1 Create Case 
+Method 	POST
+Route 	/cases
+Description 	Create a new case
+Authentication 	Required (Lawyer, Admin, Judge)
+
+
+Request Body: 
+{ "caseNumber": "string (unique)", "title": "string", "description": "string", "applicant": "string", "respondent": "string", "caseType": "string (civil|criminal|commercial)", "filedDate": "date", "lawyerId": "integer"} 
+Response (201 Created): 
+{ "id": "integer", "caseNumber": "string", "title": "string", "status": "string (Pending)", "lawyerId": "integer", "createdAt": "timestamp"}
+Error Responses: 
+• 400: Invalid fields | 409: Case number exists | 401: Not authenticated 
+Normal Course: 
+5. Lawyer submits case details 
+6. System validates all fields 
+7. Case created with Pending status 
+3.2.2 Get Case by ID 
+Method 	GET
+Route 	/cases/:caseId
+Description 	Retrieve specific case details
+Authentication 	Required
+
+
+Response (200 OK): 
+{ "id": "integer", "caseNumber": "string", "title": "string", "status": "string", "applicant": "string", "respondent": "string", "lawyerId": "integer", "assignedJudgeId": "integer (nullable)", "createdAt": "timestamp",  "updatedAt": "timestamp"} 
+Error Responses: 
+• 404: Case not found | 401: Not authenticated 
+3.2.3 List All Cases 
+Method 	GET
+Route 	/cases?status=...&page=...&limit=...
+Description 	List cases with filters
+Authentication 	Required
+
+
+Query Parameters: 
+• status (optional): Pending|Ongoing|Closed 
+• page/limit (optional): For pagination 
+Response (200 OK): 
+{ "data": [{ "id": "integer", "caseNumber": "string", "title": "string", "status": "string" }], "pagination": { "page": "integer",  "limit": "integer", "total": "integer" }} 
+3.2.4 Update Case 
+Method 	PUT
+Route 	/cases/:caseId
+Description 	Update case information
+Authentication 	Required (Lawyer/Admin)
+
+
+Request Body:
+{ "title": "string (optional)", "description": "string (optional)",  "status": "string (optional)"} 
+Error Responses: 
+• 403: No permission | 404: Case not found 
+3.2.5 Assign Case to Judge 
+Method 	POST
+Route 	/cases/:caseId/assign
+Description 	Assign case to judge
+Authentication 	Required (Admin only)
+
+
+Request Body: 
+{ "judgeId": "integer"} 
+Response (200 OK): 
+{ "id": "integer", "caseNumber": "string", "assignedJudgeId": "integer",  "status": "string (changes to Ongoing)"} 
+Error Responses: 
+• 403: Only admins can assign | 404: Case/judge not found 
+3.3 HEARING ENDPOINTS 
+3.3.1 Create Hearing 
+Method 	POST
+Route 	/hearings
+Description 	Schedule a hearing
+Authentication 	Required (Admin, Judge)
+
+
+Request Body: 
+{ "caseId": "integer", "hearingDate": "date", "hearingTime": "time (HH:MM)",  "location": "string", "description": "string (optional)", "judgeId": "integer"} 
+Response (201 Created): 
+{ "id": "integer", "caseId": "integer", "hearingDate": "date",  "hearingTime": "time", "location": "string", "judgeId": "integer", "status": "string (Scheduled)", "createdAt": "timestamp"} 
+Error Responses: 
+• 400: Invalid fields | 404: Case/judge not found | 409: Judge unavailable 
+Normal Course: 
+8. Admin/Judge submits hearing details 
+9. System validates case/judge existence and availability 
+10. Hearing created with Scheduled status 
+3.3.2 Get Hearing by ID
+Method 	GET
+Route 	/hearings/:hearingId
+Description 	Retrieve hearing details
+Authentication 	Required
+
+
+Response (200 OK): 
+{ "id": "integer", "caseId": "integer", "hearingDate": "date",  "hearingTime": "time", "location": "string", "judgeId": "integer", "status": "string", "outcome": "string (nullable)", "notes": "string (nullable)",  "createdAt": "timestamp"} 
+3.3.3 Get Hearings by Case 
+Method 	GET
+Route 	/cases/:caseId/hearings
+Description 	Get all hearings for case
+Authentication 	Required
+
+
+Response (200 OK): 
+{ "data": [{ "id": "integer", "hearingDate": "date", "hearingTime": "time", "location": "string", "status": "string", "outcome": "string"  }]} 
+3.3.4 Update Hearing Outcome 
+Method 	PUT
+Route 	/hearings/:hearingId/outcome
+Description 	Update outcome (Judge only)
+Authentication 	Required (Judge)
+
+
+Request Body: 
+{ "status": "string (Completed|Adjourned|Postponed)", "outcome": "string",  "notes": "string (optional)"} 
+Error Responses: 
+• 403: Only assigned judge can update | 404: Hearing not found 
+Alternate Flows: 
+• Completed: Case status auto-updates to Closed 
+• Postponed: New hearing can be scheduled 
+3.4 USER MANAGEMENT ENDPOINTS 
+3.4.1 Get User Profile
+Method 	GET
+Route 	/users/:userId
+Description 	Get user profile
+
+Authentication	Required (Own/Admin)
+
+
+
+
+Response (200 OK): 
+{ "id": "integer", "name": "string", "email": "string", "role": "string",  "phone": "string", "createdAt": "timestamp"} 
+Error Responses: 
+• 403: Cannot view other profiles | 404: User not found 
+3.4.2 Update User Profile 
+Method 	PUT
+Route 	/users/:userId
+Description 	Update profile
+Authentication 	Required (Own/Admin)
+
+
+Request Body: 
+{ "name": "string (optional)", "phone": "string (optional)", "password": "string (optional)"} 
+3.4.3 List All Users 
+Method 	GET
+Route 	/users?role=...&page=...
+Description 	List all users
+Authentication 	Required (Admin only)
+
+
+Error Responses: 
+• 403: Only admins can list users 
+
+4. ERROR HANDLING STRUCTURE
+HANDLING STRUCTURE 
+The API uses standard HTTP status codes and provides structured error responses. Standard Error Response Format: 
+{ "success": false, "error": { "code": "string", "message": "string",  "details": "object (optional)", "timestamp": "timestamp" }} 
+HTTP Status Codes:
+201	Created	Resource successfully created
+400	Bad Request	Invalid request data
+401	Unauthorized	Missing/invalid token
+403	Forbidden	Insufficient permissions
+404	Not Found	Resource not found
+200	OK	Request successful
+409	Conflict	Duplicate resource
+422	Unprocessable	Invalid data format
+429	Rate Limit	Too many requests
+500	Server Error	Server encountered error
+ 
+
+Common Error Scenarios: 
+• Missing Token: 401 Unauthorized 
+• Expired Token: 401 Unauthorized 
+• Invalid Token: 401 Unauthorized 
+• Insufficient Permissions: 403 Forbidden 
+• Resource Not Found: 404 Not Found 
+• Data Validation Failure: 400 Bad Request 
+• Duplicate Resource: 409 Conflict 
+• Server Error: 500 Internal Server Error 
+5. MI5. MIDDLEWARE FUNCTIONALITIES
+DDLEWARE FUNCTIONALITIES 
+Middleware components provide cross-cutting concerns and process requests before they reach route handlers. 
+5.1 Authentication Middleware 
+Purpose: 
+• Validates JWT tokens in request headers 
+• Verifies token signature and expiration 
+• Extracts user information from token claims 
+• Attaches user object to request for downstream handlers 
+Implementation Details: 
+• Checks Authorization header format: Bearer <token> 
+• Returns 401 if token missing or invalid 
+• Returns 401 if token expired 
+• Bypasses /auth endpoints (register, login) 
+5.2 Authorization Middleware 
+Purpose: 
+• Enforces role-based access control (RBAC) 
+• Restricts endpoints to specific user roles 
+Role Definitions: 
+• Lawyer: Create/view own cases, manage own profile 
+• Admin: Assign cases, manage all cases, view all users 
+• Judge: View assigned cases, schedule/update hearings 
+Implementation Details: 
+• Checks user role from authenticated request 
+• Returns 403 Forbidden if role not permitted 
+• Runs after authentication middleware
+5.3 Request Validation Middleware 
+Purpose: 
+• Validates request body, query, and route parameters • Ensures data types match expected schemas 
+• Sanitizes input to prevent injection attacks 
+Implementation Details: 
+• Validates email format using regex 
+• Validates password length (minimum 8 characters) • Validates date/time formats 
+• Returns 400 with detailed validation errors 
+5.4 Error Handling Middleware 
+Purpose: 
+• Catches unhandled errors and exceptions 
+• Converts errors to standardized API responses • Logs errors for monitoring and debugging 
+Implementation Details: 
+• Catches exceptions from route handlers 
+• Distinguishes between client (4xx) and server (5xx) errors • Returns generic messages (hides implementation details) • Logs detailed info server-side 
+5.5 Request Logging Middleware 
+Purpose: 
+• Logs all requests for audit and debugging 
+Implementation Details: 
+• Logs: Method, URL, user ID, IP, response code • Records timestamp and processing time 
+• Does not log sensitive data (passwords, tokens) 5.6 CORS Middleware 
+Purpose: 
+• Handles Cross-Origin Resource Sharing headers Implementation Details: 
+• Sets Access-Control-Allow-Origin header 
+• Specifies allowed HTTP methods 
+• Specifies allowed headers (Content-Type, Authorization) • Handles preflight OPTIONS requests 
+5.7 Rate Limiting Middleware 
+Purpose:
+• Prevents abuse by limiting requests per user/IP Implementation Details: 
+• Limits: 100 requests per 15 minutes per user • Returns 429 Too Many Requests when limit exceeded • Tracks by user ID (authenticated) or IP address 
+5.8 Body Parser Middleware 
+Purpose: 
+• Parses incoming request bodies (JSON) 
+Implementation Details: 
+• Accepts application/json content type 
+• Limits request size to prevent large payloads • Returns 413 Payload Too Large if exceeded
